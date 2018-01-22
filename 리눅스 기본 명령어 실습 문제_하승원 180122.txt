@@ -1,0 +1,35 @@
+﻿happy 디렉토리를 제거하시오.
+bluesky 디렉토리를 제거하시오.
+
+/homedir/ 디렉토리를 만드세요.
+소유자는 hadoop입니다.
+
+현재 디렉토리는 /home/hadoop/입니다.
+
+/etc/ 디렉토리 내의 다음 파일들을 /homedir/에 복사하세요.
+inittab 파일, login.defs
+
+/boot/ 디렉토리 내의 다음 파일들을 /homedir/에 복사하세요.
+grub/grub.conf
+
+/homedir/ 디렉토리 안에 있는 파일들을 /home/hadoop/에 복사하세요.
+단, login.defs 파일은 login라는 이름으로 복사하세요.
+
+/home/hadoop안에 있는 파일들을 /home/test/bluesky/ 에 복사하세요. 
+
+/homedir/ 안에 있는 파일들을 /home/test/happy/fine/에 복사하세요. 
+----------
+/home/test/bluesky/file01 파일을 만드세요.
+file01의 내용
+hahaha
+hohoho
+
+/home/test/happy/fine/file02 파일을 만드세요.
+file02의 내용
+hihihi
+
+/homedir/ 디렉토리에 file03을 만드세요.
+file03은 file01과 file02의 내용을 합친 파일이다.
+
+find 명령어를 이용하여 file02를 찾아 보세요.
+그 결과는 /home/test/findfile.txt 파일 내에 작성하도록 한다.
