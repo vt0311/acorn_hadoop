@@ -1,0 +1,33 @@
+a.xml 파일이 다음과 같다고 가정한다.
+<configuration>
+	<property>
+		<name>aaa</name>
+		<value>111</value>
+	</property>
+</configuration>
+
+a.xml 파일을 복사하여 b.xml, c.xml 파일을 만드세요.
+
+b.xml
+<configuration>
+	<property>
+		<hhh>bbb</hhh>
+		<ttt>ccc</ttt>
+	</property>
+	<property>
+		<hhh>bbb</hhh>
+		<ttt>ccc</ttt>
+	</property>
+	<property>
+		<hhh>bbb</hhh>
+		<ttt>ccc</ttt>
+	</property>
+</configuration>
+
+c.xml
+<configuration>
+	<property>
+		<message>bbb</message>
+		<answer>ccc</answer>
+	</property>
+</configuration>
