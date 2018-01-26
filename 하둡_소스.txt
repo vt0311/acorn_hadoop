@@ -1,0 +1,364 @@
+import java.io.IOException;
+import java.util.*;
+        
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.conf.*;
+import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapreduce.*;
+import org.apache.hadoop.mapreduce.lib.input.*;
+import org.apache.hadoop.mapreduce.lib.output.*;
+import org.apache.hadoop.util.GenericOptionsParser;
+
+public class CountCitation {
+        
+ public static class Map extends Mapper<Text, Text, Text, IntWritable> {
+    private final static IntWritable one = new IntWritable(1);
+        
+    public void map(Text key, Text value, Context context) throws IOException, InterruptedException {
+
+        context.write(value, one);
+
+    }
+ } 
+// WordCount의 리듀스와 동일        
+ public static class Reduce extends Reducer<Text, IntWritable, Text, IntWritable> {
+
+    public void reduce(Text key, Iterable<IntWritable> values, Context context) 
+      throws IOException, InterruptedException {
+        int sum = 0;
+        for (IntWritable val : values) {
+            sum += val.get();
+        }
+        context.write(key, new IntWritable(sum));
+    }
+ }
+        
+ public static void main(String[] args) throws Exception {
+    Configuration conf = new Configuration();
+    String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
+    Job job = new Job(conf, "CountCitation");
+
+    job.setJarByClass(CountCitation.class);    
+    // if mapper outputs are different, call setMapOutputKeyClass and setMapOutputValueClass
+    job.setOutputKeyClass(Text.class);
+    job.setOutputValueClass(IntWritable.class);
+        
+    job.setMapperClass(Map.class);
+    job.setCombinerClass(Reduce.class);
+    job.setReducerClass(Reduce.class);
+
+    // An InputFormat for plain text files. Files are broken into lines. Either linefeed or carriage-return are used to signal end of line.
+    // Keys are the position in the file, and values are the line of text..        
+
+//	TextInputFormat과 동일하게 작동하는 데 Key와 Value 사이에 tab 문자가 있다고 가정한다.
+//mapreduce.input.keyvaluelinerecordreader.key.value.separator 속성으로 구분자를 지정한다.
+
+    job.setInputFormatClass(KeyValueTextInputFormat.class);
+    job.setOutputFormatClass(TextOutputFormat.class);
+    job.setNumReduceTasks(10);
+        
+    FileInputFormat.addInputPath(job, new Path(args[0]));
+    FileOutputFormat.setOutputPath(job, new Path(args[1]));
+        
+    job.waitForCompletion(true);
+ }     
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.*;
+import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.output.*;
+import org.apache.hadoop.mapreduce.lib.input.*;
+import org.apache.hadoop.util.GenericOptionsParser;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Comparator;
+import java.util.Collections;
+import java.lang.Math;
+
+public class JoinIDTitle
+{
+    public static void main(String[] args) throws Exception {
+
+      Job pass = new Job();
+      Configuration conf = pass.getConfiguration();
+
+      String titleDocID = args[0]; // main 함수의 첫번째 인자
+      String docIDFreq = args[1]; // main 함수의 두번째 인자
+      String outputDir = args[2]; // 출력 디렉토리
+
+      if (outputDir == null || titleDocID == null || docIDFreq == null) {
+        throw new IllegalArgumentException("Missing Parameters");
+      }
+
+      pass.setJobName("Join ID and Title");
+      pass.setJarByClass(JoinIDTitle.class);
+
+      pass.setOutputKeyClass(Text.class);
+      pass.setOutputValueClass(Text.class);
+
+      // note that this setMapper call is omitted here
+      //pass.setMapperClass(MyMapper.class);
+      pass.setReducerClass(MyReducer.class);
+
+      MultipleInputs.addInputPath(pass, new Path(titleDocID), KeyValueTextInputFormat.class, MyMapper1.class);
+      MultipleInputs.addInputPath(pass, new Path(docIDFreq), KeyValueTextInputFormat.class, MyMapper2.class);
+
+      //pass.setInputFormatClass(TextInputFormat.class);
+      pass.setOutputFormatClass(TextOutputFormat.class);
+
+      //FileInputFormat.addInputPath(pass, new Path(args[0]));
+      FileOutputFormat.setOutputPath(pass, new Path(outputDir));
+
+      if(!pass.waitForCompletion(true))
+        System.exit(1);
+    }
+
+    // title + docID input file handling
+    // tag this with 1
+    public static class MyMapper1 extends Mapper<Text, Text, Text, Text> {
+
+      @Override
+      protected void map(Text key, Text value, final Context context) throws IOException, InterruptedException {
+        context.write(value, new Text(key + "\t" + 1));
+        context.getCounter("Stats", "Number of Title+DocID").increment(1);
+      }
+    }
+
+    // DocID + Number of Citation
+    // tag this with 2
+    public static class MyMapper2 extends Mapper<Text, Text, Text, Text> {
+
+      @Override
+      protected void map(Text key, Text value, final Context context) throws IOException, InterruptedException {
+        context.write(key, new Text(value + "\t" + 2));
+        context.getCounter("Stats", "DocID+Citation").increment(1);
+      }
+    }
+
+    public static class MyReducer extends Reducer<Text, Text, Text, Text> {
+
+      @Override
+      public void reduce(Text key, Iterable<Text> valueIter, final Context context) throws IOException, InterruptedException {
+
+        String title = null;
+        String frequency = null;
+        int count = 0;
+
+        for(Text t: valueIter) {
+          String str = t.toString();
+          String []tokens = str.split("\\t");
+          if (tokens[1].equals("1")) {
+            title = tokens[0];
+          }
+          else {
+            frequency = tokens[0];
+          } 
+          count++;
+        }
+
+        if (count == 2 && title != null && frequency != null) {
+            context.write(key, new Text(title + "\t" + frequency));
+            context.getCounter("Stats", "The number of pairs of matches").increment(1);
+        }
+      }
+    }
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+import org.apache.hadoop.io.*;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Comparator;
+import java.util.Collections;
+import java.lang.Math;
+
+public class ItemFreq {
+//implements Comparable<ItemFreq> {
+
+    private String item;
+    private Long freq;
+
+
+    public ItemFreq() { 
+      this.item = "";
+      this.freq = 0L;
+    }
+
+    public ItemFreq(String item, long freq) {
+            this.item = item;
+            this.freq = freq;
+    }
+
+    @Override
+    public String toString() {
+            return (new StringBuilder())
+                            .append('{')
+                            .append(item)
+                            .append(',')
+                            .append(freq)
+                            .append('}')
+                            .toString();
+    }
+
+    public String getItem() {
+            return item;
+    }
+
+    public void setItem(String item) {
+            this.item = item;
+    }
+
+    public Long getFreq() {
+            return freq;
+    }
+
+    public void setFreq(Long freq) {
+            this.freq = freq;
+    }
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+import java.io.IOException;
+import java.util.*;
+        
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.conf.*;
+import org.apache.hadoop.io.*;
+import org.apache.hadoop.mapreduce.*;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.KeyValueTextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.hadoop.util.GenericOptionsParser;
+
+public class TopN {
+
+  public static void insert(PriorityQueue queue, String item, Long lValue, int topN) {
+    ItemFreq head = (ItemFreq)queue.peek();
+
+    // 큐의 원소수가 topN보다 작거나 지금 들어온 빈도수가 큐내의 최소 빈도수보다 크면
+    if (queue.size() < topN || head.getFreq() < lValue) {
+      ItemFreq itemFreq = new ItemFreq(item, lValue);
+      // 일단 큐에 추가하고 
+      queue.add(itemFreq);
+      // 큐의 원소수가 topN보다 크면 가장 작은 원소를 제거합니다.
+      // if (queue.size() > topN && head != null && head.getFreq() < lValue) {
+      if (queue.size() > topN) {
+          queue.remove();
+      }
+    }
+  }
+      
+  public static class ItemFreqComparator implements Comparator<ItemFreq> {
+
+    //@Override
+    public int compare(ItemFreq x, ItemFreq y) {
+
+      if (x.getFreq() < y.getFreq()) {
+        return -1;
+      }
+      if (x.getFreq() > y.getFreq()) {
+        return 1;
+      }
+      return 0;
+    }
+
+  }
+
+  public static class Map extends Mapper<Text, Text, Text, LongWritable> {
+
+    private final static LongWritable one = new LongWritable(1);
+    Comparator<ItemFreq> comparator = new ItemFreqComparator();
+    PriorityQueue<ItemFreq> queue = new PriorityQueue<ItemFreq>(10, comparator);
+    int topN = 10;
+
+    @Override
+    protected void setup(Context context) throws IOException, InterruptedException {
+      topN = context.getConfiguration().getInt("topN", 10);
+    }
+
+    @Override
+    protected void cleanup(Context context) throws IOException, InterruptedException {
+
+      while (queue.size() != 0) {
+        ItemFreq item = (ItemFreq)queue.remove();
+        context.write(new Text(item.getItem()), new LongWritable(item.getFreq()));
+      }
+
+    }
+
+    public void map(Text key, Text value, Context context) throws IOException, InterruptedException {
+        Long lValue = (long)Integer.parseInt(value.toString());
+
+        insert(queue, key.toString(), lValue, topN);
+    }
+  } 
+        
+  public static class Reduce extends Reducer<Text, LongWritable, Text, LongWritable> {
+
+    Comparator<ItemFreq> comparator = new ItemFreqComparator();
+    PriorityQueue<ItemFreq> queue = new PriorityQueue<ItemFreq>(10, comparator);
+    int topN = 10;
+
+    @Override
+    protected void setup(Context context) throws IOException, InterruptedException {
+      topN = context.getConfiguration().getInt("topN", 10);
+    }
+
+    @Override
+    protected void cleanup(Context context) throws IOException, InterruptedException {
+
+      while (queue.size() != 0) {
+        ItemFreq item = (ItemFreq)queue.remove();
+        context.write(new Text(item.getItem()), new LongWritable(item.getFreq()));
+      }
+
+    }
+
+    public void reduce(Text key, Iterable<LongWritable> values, Context context) throws IOException, InterruptedException {
+        long sum = 0;
+        for (LongWritable val : values) {
+            sum += val.get();
+        }
+
+        insert(queue, key.toString(), sum, topN);
+    }
+ }
+        
+ public static void main(String[] args) throws Exception {
+    Configuration conf = new Configuration();
+    String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
+    Job job = new Job(conf, "TopN");
+
+    job.setJarByClass(TopN.class);    
+    job.setOutputKeyClass(Text.class);
+    job.setOutputValueClass(LongWritable.class);
+        
+    job.setMapperClass(Map.class);
+    job.setReducerClass(Reduce.class);
+    job.setNumReduceTasks(1);
+
+    job.setInputFormatClass(KeyValueTextInputFormat.class);
+    job.setOutputFormatClass(TextOutputFormat.class);
+        
+    FileInputFormat.addInputPath(job, new Path(args[0]));
+    FileOutputFormat.setOutputPath(job, new Path(args[1]));
+    job.getConfiguration().setInt("topN", Integer.parseInt(args[2]));
+        
+    job.waitForCompletion(true);
+ }
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
