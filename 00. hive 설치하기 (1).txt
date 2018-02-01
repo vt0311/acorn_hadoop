@@ -1,0 +1,98 @@
+cdhive 설치
+
+참조 사이트 : http://blrunner.tistory.com/100
+
+다운로드 경로
+http://www.apache.org/dyn/closer.cgi/hive/
+
+관리자로 로그인
+su -
+Password: 
+cd /usr/local
+tar -xvf /home/hadoop/Downloads/apache-hive-2.1.1-bin.tar.gz 
+chown -R hadoop:hadoop /usr/local/apache-hive-2.1.1-bin/
+exit
+
+배시 파일 설정
+cd
+vi .bash_profile
+export HIVE_HOME=/usr/local/apache-hive-2.1.1-bin
+export PATH=$PATH:$JAVA_HOME/bin:$HADOOP_HOME/bin:$HIVE_HOME/bin:/usr/local/eclipse/
+
+!wq
+
+source .bash_profile
+
+cd /usr/local/apache-hive-2.1.1-bin/
+cd conf
+cp hive-env.sh.template hive-env.sh
+
+vi hive-env.sh
+# 하둡 설치 디렉토리 지정
+HADOOP_HOME=/usr/local/hadoop-2.7.4
+export HADOOP_HEAPSIZE=1024 # 주석 풀기
+
+# vi hive-site.xml
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<configuration>
+<property>
+<name>hive.exec.scracd tchdir</name>
+<value>/usr/local/tmp/hive-hadoop</value>
+</property>
+<property>
+<name>hive.exec.local.scratchdir</name>
+<value>/usr/local/tmp/hadoop</value>
+</property>
+<property>
+<name>hive.metastore.warehouse.dir</name>
+<value>/usr/local/apache-hive-2.1.1-bin/warehouse</value>
+</property>
+<property>
+<name>hive.querylog.location</name>
+<value>/usr/local/tmp/hadoop</value>
+</property>
+<property>
+<name>hive.metastore.schema.verification</name>
+<value>false</value>
+</property>
+</configuration>
+
+# 관리자 모드
+mkdir -p /usr/local/tmp/hive-hadoop
+mkdir -p /usr/local/tmp/hadoop
+mkdir -p /usr/local/apache-hive-2.1.1-bin/warehouse
+
+chown -R hadoop:hadoop /usr/local/tmp/hive-hadoop
+chown -R hadoop:hadoop /usr/local/tmp/
+chown -R hadoop:hadoop /usr/local/apache-hive-2.1.1-bin/warehouse
+exit
+
+# 일반 사용자 모드
+cd /usr/local/apache-hive-2.1.1-bin/bin
+schematool -initSchema -dbType derby
+
+# 만일 위의 문장을 실행했을 때 오류가 나면 다음 문장을 우선 실행하고 다시 실행해 보도록 한다.
+mv metastore_db metastore_db.tmp
+
+hive
+
+임시 디렉토리
+rm -rf /usr/local/hadoop-2.7.4/tmp/dfs
+
+# 하둡홈/etc/hadoop 에서 한다.
+# vi hdfs-site.xml 파일 추가 설정
+<property>
+<name>dfs.namenode.name.dir</name>
+<value>/usr/local/myhadoop/name</value>
+</property>
+<property>
+<name>dfs.datanode.data.dir</name>
+<value>/usr/local/myhadoop/data</value>
+</property>
+
+# 데이터 저장소
+mkdir -p /usr/local/myhadoop/name
+mkdir -p /usr/local/myhadoop/data
+
+chown -R hadoop:hadoop /usr/local/myhadoop/name/
+chown -R hadoop:hadoop /usr/local/myhadoop/data/
